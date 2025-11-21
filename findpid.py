@@ -12,7 +12,7 @@ from enum import Enum
 from typing import Callable, Optional
 
 # Uncomment for actual Raspberry Pi usage:
-# import RPi.GPIO as GPIO
+import RPi.GPIO as GPIO
 
 
 class TuningMethod(Enum):
@@ -543,3 +543,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+
