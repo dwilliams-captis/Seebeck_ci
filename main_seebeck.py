@@ -16,6 +16,7 @@ from daqhats import mcc134, hat_list, HatIDs, TcTypes
 from simple_pid import PID
 import serial
 import serial.tools.list_ports
+from seebeck_calculation import seebeck_calc
 
 # GPIO setup using gpiozero PWM
 HEATER1_PIN = 16
@@ -279,46 +280,29 @@ class HeaterApp(QWidget):
         self.update_temp_plot()
 
     def manage_seebeck_cycle(self, error1):
-        """Manage the automated Seebeck test cycle using temperature sequence array"""
-        print(f"Current Error Sign: {current_error_sign}; Error1: {error1}")
-        current_error_sign = 1 if error1 > 0 else -1
-        
-        # Detect zero crossing (error changes sign)
-        if self.last_error_sign != 0 and current_error_sign != self.last_error_sign: #set point crossing occurred
-            self.zero_crossing_count += 1
-            
-            # Get current stage requirements
+        """Manage the automated Seebeck test cycle using a timed hold at each temperature"""
+        # On first entry to a stage, record the start time
+        if not hasattr(self, 'stage_start_time') or self.stage_start_time is None:
+            self.stage_start_time = time.time()
+            print(f"Stage {self.cycle_stage} started at {self.stage_start_time}")
+
+        elapsed = time.time() - self.stage_start_time
+        hold_time = 120  # seconds (2 minutes)
+
+        if elapsed >= hold_time:
+            # Move to next stage
+            self.cycle_stage += 1
+            self.stage_start_time = None
+
             if self.cycle_stage < len(self.seebeck_temp_sequence):
-                temp1_target, temp2_target, required_crossings = self.seebeck_temp_sequence[self.cycle_stage]
-           
-                print(f"Zero crossing detected! {error1} Count: {self.zero_crossing_count}/{required_crossings}, Stage: {self.cycle_stage}, Target: {temp1_target}°C")
-                
-                # Check if we've completed the required crossings for this stage
-                if self.zero_crossing_count >= required_crossings:
-                    # Move to next stage
-                    self.cycle_stage += 1
-                    self.zero_crossing_count = 0
-                    
-                    # Check if there's another stage
-                    if self.cycle_stage < len(self.seebeck_temp_sequence):
-                        # Set temperatures for next stage
-                        next_temp1, next_temp2, next_crossings = self.seebeck_temp_sequence[self.cycle_stage]
-                        
-                        
-                        self.setpoint1_value = next_temp1
-                        self.setpoint2_value = next_temp2
-                        self.update_setpoint_displays()
-
-                        time.sleep(10)
-                        print(f"Stage {self.cycle_stage - 1} complete. Moving to Stage {self.cycle_stage}: Set heater 1 to {next_temp1}°C, heater 2 to {next_temp2}°C [{error1}]")
-                        print(f"New error: {self.setpoint1_value}")
-
-                    else:
-                        # All stages complete
-                        print("All stages complete! Finishing Seebeck cycle...")
-                        self.complete_seebeck_cycle()
-        print(f"New setpoint value: {self.setpoint1_value}")                
-        self.last_error_sign = current_error_sign
+                next_temp1, next_temp2, _ = self.seebeck_temp_sequence[self.cycle_stage]
+                self.setpoint1_value = next_temp1
+                self.setpoint2_value = next_temp2
+                self.update_setpoint_displays()
+                print(f"Stage {self.cycle_stage - 1} complete. Moving to Stage {self.cycle_stage}: Set heater 1 to {next_temp1}°C, heater 2 to {next_temp2}°C")
+            else:
+                print("All stages complete! Finishing Seebeck cycle...")
+                self.complete_seebeck_cycle()
 
     def update_setpoint_displays(self):
         if hasattr(self, 'setpoint1_display'):
@@ -587,11 +571,16 @@ class HeaterApp(QWidget):
         sum_x2 = sum(x * x for x in temp_diffs)
         
         denominator = n * sum_x2 - sum_x * sum_x
+
+        
+
         if abs(denominator) < 1e-10:
             return 0.0
         
         slope = (n * sum_xy - sum_x * sum_y) / denominator
-        return slope
+        seebeckCalc, seebeckCalc_STDEV = seebeck_calc(self.voltage_data,"odr") # Calculate Seebeck 
+
+        return seebeckCalc #slope
 
     def rescale_plot(self):
         self.update_plot(last_30_only=True)
