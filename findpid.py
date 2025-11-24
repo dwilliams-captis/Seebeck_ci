@@ -552,7 +552,66 @@ class AutoTunerApp(QWidget):
         self.tune_ax.plot(t, temp, 'b-', label='Temperature')
         self.tune_ax.plot(t, sp, 'r--', label='Setpoint')
         ax2 = self.tune_ax.twinx()
-        ax2.fill_between(t, out, alpha=0.3, color='orange', label='Output %')
+        ax2.fill_between(t, out, alpha=0.3, color='orange')
+        ax2.set_ylabel('Output %')
+        ax2.set_ylim(0, 120)
+        self.test_ax.set_xlabel('Time (s)')
+        self.test_ax.set_ylabel('Temperature (°C)')
+        self.test_ax.legend(loc='upper left')
+        self.test_canvas.draw()
+
+    def calculate_metrics(self):
+        if len(self.test_data) < 10:
+            return
+        temps = [d[1] for d in self.test_data]
+        setpoint = self.test_data[0][2]
+        initial = temps[0]
+
+        # Overshoot
+        max_temp = max(temps)
+        overshoot = ((max_temp - setpoint) / (setpoint - initial) * 100) if max_temp > setpoint and setpoint != initial else 0
+
+        # Rise time (10% to 90%)
+        r10 = initial + 0.1 * (setpoint - initial)
+        r90 = initial + 0.9 * (setpoint - initial)
+        t10 = t90 = None
+        for d in self.test_data:
+            if t10 is None and d[1] >= r10:
+                t10 = d[0]
+            if t90 is None and d[1] >= r90:
+                t90 = d[0]
+        rise_time = (t90 - t10) if t10 and t90 else None
+
+        # Settling time (2% band)
+        tol = abs(setpoint - initial) * 0.02
+        settle_time = None
+        for i in range(len(temps) - 1, -1, -1):
+            if abs(temps[i] - setpoint) > tol:
+                if i + 1 < len(self.test_data):
+                    settle_time = self.test_data[i + 1][0]
+                break
+
+        # Steady-state error
+        ss_temps = temps[-20:] if len(temps) >= 20 else temps
+        ss_error = setpoint - (sum(ss_temps) / len(ss_temps))
+
+        txt = f"Overshoot: {overshoot:.1f}%\n"
+        txt += f"Rise Time (10-90%): {rise_time:.1f}s\n" if rise_time else "Rise Time: N/A\n"
+        txt += f"Settling Time (2%): {settle_time:.1f}s\n" if settle_time else "Settling Time: N/A\n"
+        txt += f"Steady-State Error: {ss_error:.2f}°C"
+        self.metrics_label.setText(txt)
+
+    def closeEvent(self, event):
+        self.heater1.value = 0
+        self.heater2.value = 0
+        event.accept()
+
+
+if __name__ == "__main__":
+    app = QApplication(sys.argv)
+    window = AutoTunerApp()
+    window.show()
+    sys.exit(app.exec_()), color='orange', label='Output %')
         ax2.set_ylabel('Output %')
         ax2.set_ylim(0, 120)
         self.tune_ax.set_xlabel('Time (s)')
@@ -593,4 +652,4 @@ class AutoTunerApp(QWidget):
         self.test_ax.plot(t, temp, 'b-', label='Temperature', linewidth=2)
         self.test_ax.plot(t, sp, 'r--', label='Setpoint')
         ax2 = self.test_ax.twinx()
-        ax2.fill_between(t, out, alpha=0.3
+        ax2.fill_between(t, out, alpha=0.3, color='orange')
