@@ -611,45 +611,4 @@ if __name__ == "__main__":
     app = QApplication(sys.argv)
     window = AutoTunerApp()
     window.show()
-    sys.exit(app.exec_()), color='orange', label='Output %')
-        ax2.set_ylabel('Output %')
-        ax2.set_ylim(0, 120)
-        self.tune_ax.set_xlabel('Time (s)')
-        self.tune_ax.set_ylabel('Temperature (°C)')
-        self.tune_ax.legend(loc='upper left')
-        self.tune_canvas.draw()
-
-    def start_test(self):
-        heater_idx = self.test_heater_combo.currentIndex()
-        pid = self.pid1 if heater_idx == 0 else self.pid2
-        pid.setpoint = self.test_target_spin.value()
-        pid.reset()
-        self.test_data = []
-        self.test_start_time = time.time()
-        self.test_active = True
-        self.test_start_btn.setEnabled(False)
-        self.test_stop_btn.setEnabled(True)
-
-    def stop_test(self):
-        self.test_active = False
-        self.heater1.value = 0
-        self.heater2.value = 0
-        self.test_start_btn.setEnabled(True)
-        self.test_stop_btn.setEnabled(False)
-
-    def test_complete(self):
-        self.stop_test()
-        self.calculate_metrics()
-
-    def update_test_plot(self):
-        if not self.test_data:
-            return
-        self.test_ax.clear()
-        t = [d[0] for d in self.test_data]
-        temp = [d[1] for d in self.test_data]
-        sp = [d[2] for d in self.test_data]
-        out = [d[3] * 100 for d in self.test_data]
-        self.test_ax.plot(t, temp, 'b-', label='Temperature', linewidth=2)
-        self.test_ax.plot(t, sp, 'r--', label='Setpoint')
-        ax2 = self.test_ax.twinx()
-        ax2.fill_between(t, out, alpha=0.3, color='orange')
+    sys.exit(app.exec_())
